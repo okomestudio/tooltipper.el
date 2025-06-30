@@ -4,7 +4,7 @@
 ;;
 ;; Author: Taro Sato <okomestudio@gmail.com>
 ;; URL: https://github.com/okomestudio/tooltipper.el
-;; Version: 0.1.1
+;; Version: 0.1.2
 ;; Keywords: help tools
 ;; Package-Requires: ((emacs "29.1"))
 ;;
@@ -44,14 +44,29 @@
   :type 'number
   :group 'tooltipper)
 
+(defun tooltipper-inspect-invisibles ()
+  "Get the position of an at-point element.
+Some elements like Org link may have tooltip texts embedded in hidden
+parts. This function inspects such element to obtain the point of
+interest."
+  ;; Get to the path in an Org link in case it is invisible.
+  (and (derived-mode-p 'org-mode)
+       (org-in-regexp org-link-any-re)
+       (when-let* ((text (match-string 0))
+                   (start (match-beginning 0))
+                   (key-start (string-match ":" text)))
+         (+ 1 start key-start))))
+
 (defun tooltipper-display-at-point ()
   "Display a tooltip for the text at point, if available."
   (interactive)
   (when-let*
       ((point (point))
+       (tooltip-point (or (tooltipper-inspect-invisibles)
+                          point))
        (tooltip-text (and (not (minibufferp))
                           (bound-and-true-p tooltip-mode)
-                          (get-text-property point 'help-echo)))
+                          (get-text-property tooltip-point 'help-echo)))
        (x-max-tooltip-size '(80 . 25))
        (tooltip-frame-parameters tooltip-frame-parameters)
        (window (selected-window))
@@ -68,7 +83,7 @@
        (window-top (nth 1 window-origin))
        (text (if (stringp tooltip-text)
                  tooltip-text
-               (funcall tooltip-text window nil point)))
+               (funcall tooltip-text window nil tooltip-point)))
        (space-width (string-pixel-width " "))
        (dx (min (length (substring-no-properties text))
                 (car x-max-tooltip-size)))
